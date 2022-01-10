@@ -111,6 +111,9 @@ class Vocabulary():
         else:
             return self.word_frequencies
         
+    def __len__(self):
+        return len(self.idx_to_word)
+        
 
 
 class FlickrDataset(Dataset):
