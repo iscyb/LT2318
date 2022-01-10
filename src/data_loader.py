@@ -19,7 +19,7 @@ TODO:
 
 """
 
-class VocabularyParser():
+class Vocabulary():
     """
     Numericalize vocabulary
     
@@ -82,6 +82,7 @@ class VocabularyParser():
         
     def apply(self, sentences:Union[List[str], str], add_start_end=True):
         """
+        todo: remove?
         sentences either list of sentences or one sentence.
         """
         if isinstance(sentences, str):
@@ -90,7 +91,7 @@ class VocabularyParser():
             return [self.numericalize_sentence(s, add_start_end) for s in sentences]
 
         
-    def numericalize_sentence(self, sentence, add_start_end):
+    def numericalize_sentence(self, sentence:str, add_start_end=True):
         tokens = self.tokenize_sentence(sentence)
         num_sentence = [self.word_to_idx.get(t, self.word_to_idx[self.unk_label]) for t in tokens]
         if add_start_end:
@@ -140,7 +141,7 @@ class FlickrDataset(Dataset):
         self.end_label = end_label
         self.pad_label = pad_label
         
-        self.vocab = VocabularyParser(
+        self.vocab = Vocabulary(
             unk_cutoff=self.unk_cutoff,
             unk_label= self.unk_label,
             start_label=self.start_label,
@@ -170,45 +171,36 @@ class FlickrDataset(Dataset):
     
 class Collate():
     """
-    For batching
+    Collate to apply the padding to the captions with dataloader
     """
-    def __init__(self, pad_idx):
+    def __init__(self, pad_idx, batch_first=False):
         self.pad_idx = pad_idx
-    
+        self.batch_first = batch_first
     def __call__(self, batch):
         #.unsqueeze(0) to make concatable by correct dimension.
         # Assume equal size images, otherwise torch.cat does not work.
-        images = torch.cat([i[0].unsqueeze(0) for i in batch])
+        images = torch.cat([i[0].unsqueeze(0) for i in batch], dim=0)
         # batch_first=False each caption is a column
-        captions = pad_sequence([i[1] for i in batch], batch_first=False, padding_value=self.pad_idx)
+        captions = pad_sequence([i[1] for i in batch], batch_first=self.batch_first, padding_value=self.pad_idx)
         return images, captions
     
 def get_loader(
-                images_dir,
-                captions_path,
+                dataset,
                 transform=None,
                 batch_size=32,
                 num_workers=4,
+                batch_first=False,
                 shuffle=True,
                 pin_memory=True,
             ):
     
-    pad_label='<PAD>'
+    """
+    batch_first: specifies which dimension batches should span
+    shuffle: shuffle data
     
-    if transform is None:
-        transform = transforms.Compose(
-                [transforms.Resize((224, 224)),
-                 transforms.ToTensor(),
-                 transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                      std=[0.229, 0.224, 0.225])]
-            )
-    dataset = FlickrDataset(
-        images_dir=images_dir,
-        captions_path=captions_path,
-        transform=transform,
-        pad_label=pad_label)
-
-    pad_idx = dataset.vocab.word_to_idx[pad_label]
+    """
+    
+    pad_idx = dataset.vocab.word_to_idx[dataset.vocab.pad_label]
 
     loader = DataLoader(
         dataset=dataset,
@@ -216,10 +208,10 @@ def get_loader(
         num_workers=num_workers,
         shuffle=shuffle,
         pin_memory=pin_memory,
-        collate_fn=Collate(pad_idx=pad_idx),
+        collate_fn=Collate(pad_idx=pad_idx, batch_first=batch_first)
     )
-
-    return loader, dataset
+    
+    return loader
 
     
 # library
