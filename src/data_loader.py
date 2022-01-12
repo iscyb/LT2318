@@ -203,7 +203,10 @@ def get_loader(
     
     """
     
-    pad_idx = dataset.vocab.word_to_idx[dataset.vocab.pad_label]
+    if isinstance(dataset, torch.utils.data.dataset.Subset): # train/val
+        pad_idx = dataset.dataset.vocab.word_to_idx[dataset.dataset.vocab.pad_label]
+    else:
+        pad_idx = dataset.vocab.word_to_idx[dataset.vocab.pad_label]
 
     loader = DataLoader(
         dataset=dataset,
